@@ -1,0 +1,113 @@
+body{
+    padding: 10px;
+    background: #5d5d5d url(http://ds06e4ewgvp7g.cloudfront.net/0.2.87gz/dshot/images/layout/bg/grain.png);
+    font-family: Helvetica, Arial, sans-serif;
+    color: white;
+}
+pre{
+    margin-top: 10px;
+}
+
+h1{
+    font-size: 150%;
+    text-shadow: text-shadow: rgba(0, 0, 0, 0.863281) 0px 1px;
+}
+
+#page{
+    width: 950px;
+    height: 100%;
+    margin: 0 auto;
+}
+
+#intro{
+    text-align: center;
+}
+#intro card-table{
+    border: 1px solid black;
+    padding: 10px;
+}
+
+.card-stack{
+    border: 1px solid black;
+    width: 75px;
+    height: 100px;
+    padding: 5px;
+    margin: 5px;
+    display: inline-block;
+}
+#deck-w{
+    display: inline-block;
+    float: left;
+}
+#play-tallie{
+    text-align: center;
+    font-size: 150%;
+}
+#starter-card{
+    display: inline-block;
+}
+#played-cards{
+    float: left;
+}
+#crib {
+    float: right;
+}
+#hand-w{
+    clear: both;
+}
+#hand{
+    width: 100%;
+    text-align: center;
+}
+
+#footer{
+    clear: both;
+}
+
+.hearts,.diams{
+    color: red;
+}
+.spades,.clubs{
+    color: black;
+}
+div.card{
+    display: inline-block;
+    display: -moz-inline-block;
+    background: white url(http://ds06e4ewgvp7g.cloudfront.net/0.2.87gz/dshot/images/layout/bg/grain.png);
+    width: 75px;
+    height: 100px;
+    border: 2px solid black;
+    padding: 5px;
+    -moz-border-radius: 5px;
+    -webkit-border-radius: 5px;
+    -o-border-radius: 5px;
+    margin: 5px;
+    cursor: pointer;
+}
+div.card.selected{
+    border: 2px solid blue;
+    position: relative;
+    top: -20px;
+}
+
+div.card div.corner{
+    float: left;
+}
+div.card div.corner span{
+    display: block;
+    width: 20px;
+    text-align: center;
+    font-size: 20px;
+}
+div.card div.tl span.num{
+}
+div.card div.corner span.suit{
+    margin-top: -5px;
+}
+div.card div.br{
+    -moz-transform: rotate(180deg);
+    -webkit-transform: rotate(180deg);
+    position: relative;
+    top: 55px;
+    float: right;
+}
