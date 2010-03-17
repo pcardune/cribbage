@@ -1,24 +1,21 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <title>Cribbage</title>
-    <link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/combo?2.6.0/build/reset-fonts/reset-fonts.css" />
+    <link rel="stylesheet" type="text/css" href="reset-fonts.css" />
     <link rel="stylesheet" href="cribbage.css"/>
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.0/jquery.min.js"
+    <script src="jquery.min.js"
             type="text/javascript"
             language="Javascript"></script>
-    <!--script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.5.3/jquery-ui.min.js"
-            type="text/javascript"
-            language="Javascript"></script-->
     <script src="cribbage.js" type="text/javascript" language="Javascript"></script>
   </head>
   <body>
 
     <div id="page">
-      <div id="intro">
+      <div id="intro" style="display: none;">
         <h1>Welcome to Cribbage</h1>
         <button id="new-game">New Game</button>
       </div>
-      <div id="card-table">
+      <div id="card-table" style="display: none;">
         <div id="instructions">
         </div>
         <div id="score-board">
@@ -35,8 +32,9 @@
           Your Hand
           <div id="hand"></div>
         </div>
-        <button id="deal">Deal</button>
-        <button id="add-to-crib" disabled="disabled">Add To Crib</button>
+        <button id="deal" style="display: none;">Deal</button>
+        <button id="add-to-crib" style="display: none;">Add To Crib</button>
+        <button id="go" style="display: none;">Go</button>
       </div>
     </div>
     <div id="footer">

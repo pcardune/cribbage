@@ -13,26 +13,25 @@ var cribbage = {};
      var ACE = 1;
 
 
+     /**
+      * Log messages to the screen.
+      */
+     function log(){
+         try{
+             console.log.apply(this, arguments);
+         } catch (e){
+             console.log(arguments);
+         }
+
+         var a = [];
+         for (var i=0; i<arguments.length; i++){
+             a.push(arguments[i]);
+         }
+         //document.write("<pre>"+a.join(" ")+"</pre>");
+     }
+
      cribbage.model = (
          function(){
-
-
-             /**
-              * Log messages to the screen.
-              */
-             function log(){
-                 try{
-                     console.log.apply(this, arguments);
-                 } catch (e){
-                     console.log(arguments);
-                 }
-
-                 var a = [];
-                 for (var i=0; i<arguments.length; i++){
-                     a.push(arguments[i]);
-                 }
-                 //document.write("<pre>"+a.join(" ")+"</pre>");
-             }
 
              /**
               * Get permuations of stuff.
@@ -654,14 +653,268 @@ var cribbage = {};
      cribbage.ui = (
          function(){
 
-             function CribbageUI(){
+             var defaultCribbageUIConfig = {
+                 introEl: "#intro",
+                 newGameEl: "#new-game",
+                 cardTableEl: "#card-table",
+                 dealEl: "#deal",
+                 handEl: "#hand",
+                 cardEl: ".card",
+                 deckEl: "#deck",
+                 addToCribEl: "#add-to-crib",
+                 splitDeckEl: "#split-deck",
+                 instructionsEl: "#instructions",
+                 playCountEl: "#play-tallie"
+             };
+
+             function renderCards(cards){
+                 var html = "";
+                 for (var i=0; i<cards.length; i++){
+                     html += cards[i].toHtml();
+                 }
+                 return html;
+             }
+
+             /**
+              * proxy a function to control what "this" is.
+              */
+             function p(func, scope){
+                 var wrapped = function(){
+                     func.apply(scope, $.merge([this],arguments));
+                 };
+                 return wrapped;
+             }
+
+             function CribbageUI(config){
+                 this.game = null;
+                 this.introEl = null;
+                 this.config = $.extend({},defaultCribbageUIConfig,config||{});
+                 this.currentState = null;
+                 this.states = [NewRoundState, ChooseCribState, SplitDeckState, PlayCardsState];
+             }
+
+             /**
+              * Initialize the UI.  This should be called once all DOM is ready.
+              */
+             CribbageUI.prototype.init = function(){
+                 // grab all the elements.
+                 this.introEl = $(this.config.introEl).show();
+                 this.newGameEl = $(this.config.newGameEl);
+                 this.cardTableEl = $(this.config.cardTableEl);
+                 this.instructionsEl = $(this.config.instructionsEl);
+
+                 // bind all the elements
+                 this.newGameEl.click(p(this.startNewGame, this));
+             };
+
+             CribbageUI.prototype.setInstructions = function(instructions){
+                 this.instructionsEl.html(instructions);
+             };
+
+             CribbageUI.prototype.startNewGame = function(){
+                 this.introEl.hide();
+                 this.newGameEl.hide();
+                 this.cardTableEl.show();
                  this.game = new cribbage.model.Cribbage();
-             }
+                 this.game.newRound();
+                 this.finishState();
+                 //this.currentState = new NewRoundState(this).init();
+             };
 
-             CribbageUI.prototype.newGame = function(){
-                 
-             }
+             CribbageUI.prototype.finishState = function(state){
+                 if (this.currentState) this.currentState.destroy();
+                 var NextState = this.states.shift();
+                 if (NextState){
+                     log("Moving to state: "+NextState.name);
+                     this.currentState = new NextState(this).init();
+                 } else {
+                     log("Nothing left to do.");
+                 }
 
+             };
+
+             function GameState(ui){
+                 this.ui = ui;
+                 this.config = ui.config;
+                 this.human = ui.game.players[0];
+                 this.computer = ui.game.players[1];
+                 this.game = ui.game;
+             }
+             GameState.prototype.finish = function(){
+                 this.ui.finishState(this);
+             };
+             GameState.prototype.destroy = function(){
+                 // no-op
+             };
+
+             /**
+              * A new round.
+              */
+             function NewRoundState(ui){
+                 GameState.call(this, ui);
+             }
+             $.extend(NewRoundState.prototype, GameState.prototype);
+             NewRoundState.prototype.init = function(){
+                 this.dealEl = $(this.config.dealEl).show();
+                 this.handEl = $(this.config.handEl).show();
+                 this.dealEl.click(p(this.dealCards, this));
+                 this.ui.setInstructions("Start the round by dealing the cards.");
+                 return this;
+             };
+             NewRoundState.prototype.dealCards = function(){
+                 this.handEl.html(renderCards(this.game.players[0].cards));
+                 this.finish();
+             };
+             NewRoundState.prototype.destroy = function(){
+                 this.dealEl.hide();
+                 this.handEl.hide();
+             };
+
+             function ChooseCribState(ui){
+                 GameState.call(this, ui);
+             }
+             $.extend(ChooseCribState.prototype, GameState.prototype);
+
+             ChooseCribState.prototype.init = function(){
+                 this.handEl = $(this.config.handEl);
+                 this.cardEls = this.handEl.find(this.config.cardEl);
+                 this.addToCribEl = $(this.config.addToCribEl);
+
+                 this.handEl.show();
+                 this.cardEls.click(p(this.toggleCardForCrib, this));
+                 this.addToCribEl.hide();
+                 this.addToCribEl.click(p(this.addCardsToCrib, this));
+                 var count = this.game.getCribCardCountPerPlayer();
+                 this.ui.setInstructions("Select "+count+" card"+(count>1?'s':'')+" for the crib.");
+                 return this;
+             };
+             ChooseCribState.prototype.destroy = function(){
+                 this.cardEls.unbind("click");
+                 this.addToCribEl.hide().unbind("click");
+             };
+
+             ChooseCribState.prototype.addCardsToCrib = function(){
+                 var self = this;
+                 this.cardEls.each(
+                     function(i, card){
+                         card = $(card);
+                         if (card.is(".selected")){
+                             card.remove();
+                             self.game.round.addToCrib(self.human.getCardsForCrib(card.attr('id')));
+                         }
+                     });
+                 // Add opponent's cards to crib.
+                 this.game.round.addToCrib(this.computer.pickCardsForCrib(this.game.getCribCardCountPerPlayer()));
+                 this.finish();
+             };
+
+             ChooseCribState.prototype.toggleCardForCrib = function(card){
+                 card = $(card);
+                 var isSelected = card.is(".selected");
+                 var needed = this.ui.game.getCribCardCountPerPlayer();
+                 var count = this.handEl.find(".selected").length;
+                 if (isSelected){
+                     card.removeClass("selected");
+                     this.addToCribEl.hide();
+                 } else if (count < needed){
+                     card.addClass("selected");
+                     if (count+1 == needed){
+                         this.addToCribEl.show();
+                     }
+                 }
+             };
+
+             function SplitDeckState(ui){
+                 GameState.call(this, ui);
+             }
+             $.extend(SplitDeckState.prototype, GameState.prototype);
+
+             SplitDeckState.prototype.init = function(){
+                 this.splitDeckEl = $(this.config.splitDeckEl).show();
+                 this.deckEl = $(this.config.deckEl).show().addClass("card-stack");
+
+                 this.splitDeckEl.click(p(this.splitTheDeck, this));
+                 this.ui.setInstructions("Split the deck.");
+                 return this;
+             };
+
+             SplitDeckState.prototype.destroy = function(){
+                 this.splitDeckEl.hide().unbind("click");
+             };
+
+             SplitDeckState.prototype.splitTheDeck = function(){
+                 this.game.splitAndStart(12); // XXX: allow selection of card to split.
+                 this.deckEl.html(this.game.round.starterCard.toHtml()).removeClass("card-stack");
+                 this.finish();
+             };
+
+
+             function PlayCardsState(ui){
+                 GameState.call(this, ui);
+             }
+             $.extend(PlayCardsState.prototype, GameState.prototype);
+             PlayCardsState.prototype.init = function(){
+                 this.handEl = $(this.config.handEl);
+                 this.cardEls = this.handEl.find(this.config.cardEl);
+                 this.playCountEl = $(this.config.playCountEl);
+                 this.goEl = $(this.config.goEl);
+
+                 this.cardEls.click(p(this.playCard, this));
+                 this.ui.setInstructions("Play your cards.");
+                 return this;
+             };
+
+             PlayCardsState.prototype.updateScore = function(){
+                 this.playCountEl.html(this.game.round.value);
+             };
+
+             PlayCardsState.prototype.zero = function(){
+                 this.game.round.zero();
+                 $("#played-cards").html('');
+             };
+
+             PlayCardsState.prototype.playCard = function(cardToPlay){
+                 if (!this.human.canPlay(this.game.round)){
+                     return false;
+                 }
+                 cardToPlay = $(cardToPlay);
+                 this.game.round.playCard(this.human.getCardToPlay(cardToPlay.attr("id")),
+                                          this.human);
+                 cardToPlay.unbind("click").appendTo("#played-cards");
+                 this.updateScore();
+                 if (this.game.round.cantContinue){
+                     this.zero();
+                 } else {
+                     var p1Card = this.computer.pickCardToPlay(this.game.round);
+                     if (p1Card){
+                         $(p1Card.toHtml()).appendTo("#played-cards");
+                     }
+                     this.computer.points += this.game.round.playCard(p1Card, this.computer);
+                     if (this.game.round.cantContinue){
+                         this.zero();
+                     } else if (!this.human.canPlay(this.game.round)){
+                         this.goEl.show().click(p(this.go, this));
+                     }
+                 }
+                 this.updateScore();
+                 return true;
+             };
+             PlayCardsState.prototype.go = function(){
+                 while (!this.game.round.cantContinue){
+                     var p1Card = this.computer.pickCardToPlay(this.game.round);
+                     $(p1Card.toHtml()).appendTo("#played-cards");
+                     this.computer.points += this.game.round.playCard(p1Card, this.computer);
+                 }
+                 if (this.game.round.finished){
+                     this.finish();
+                 } else {
+                     this.zero();
+                 }
+             };
+
+             return {
+                 CribbageUI: CribbageUI
+             };
 
          })();
 
@@ -670,107 +923,102 @@ var cribbage = {};
 
 $(function(){
 
-      GAME = null;
-
-      function startNewGame(){
-          $("#intro").hide();
-          GAME = new cribbage.model.Cribbage();
-      }
-
-      function renderCards(cards){
-          var html = "";
-          for (var i=0; i<cards.length; i++){
-              html += cards[i].toHtml();
-          }
-          return html;
-      }
-
-      function toggleCardForCrib(){
-          var isSelected = $(this).is(".selected");
-          var needed = GAME.getCribCardCountPerPlayer();
-          var count = $(this).parent().find(".selected").length;
-          if (isSelected){
-              $(this).removeClass("selected");
-              $("#add-to-crib").attr("disabled", true);
-          } else if (count < needed){
-              $(this).addClass("selected");
-              if (count+1 == needed){
-                  $("#add-to-crib").attr("disabled", false);
-              }
-          }
-      }
-
-      function dealCards(){
-          GAME.newRound();
-          $("#hand").append(renderCards(GAME.players[0].cards));
-          $("#hand .card").click(toggleCardForCrib);
-      }
-
-      function updateScoreBoard(){
-          $("#score-board").html("p1: "+GAME.players[0].points+" p2: "+GAME.players[1].points);
-          $("#play-tallie").html(GAME.round.value);
-      }
-
-      function playCard(){
-          var cardToPlay = this;
-          $(this).attr("id");
-          $("#hand .card").each(
-              function(i, card){
-                  if (card === cardToPlay){
-                      GAME.players[0].points += GAME.round.playCard(
-                          GAME.players[0].getCardToPlay($(card).attr("id")),
-                          GAME.players[0]);
-                  }
-              });
-          $(cardToPlay).appendTo("#played-cards");;
-          if (GAME.round.cantContinue){
-              GAME.round.zero();
-          } else {
-              var p1Card = GAME.players[1].pickCardToPlay(GAME.round);
-              $(p1Card.toHtml()).appendTo("#played-cards");
-              GAME.players[1].points += GAME.round.playCard(p1Card, GAME.players[1]);
-          }
-          updateScoreBoard();
-
-      }
-
-      function splitTheDeck(){
-          GAME.splitAndStart(12);
-          $("#split-deck").hide();
-          $("#deck").html(GAME.round.starterCard.toHtml()).removeClass("card-stack");
-          $("#hand .card").unbind("click",toggleCardForCrib).click(playCard);
-      }
-
-      function addToCrib(){
-          $("#hand .card").each(
-              function(i, card){
-                  if ($(card).is(".selected")){
-                      $(card).remove();
-                      GAME.round.addToCrib(GAME.players[0].getCardsForCrib($(card).attr('id')));
-                  }
-              });
-          // Add opponent's cards to crib.
-          GAME.round.addToCrib(GAME.players[1].pickCardsForCrib(GAME.getCribCardCountPerPlayer()));
-          $("#split-deck").show();
-      }
-
-      $("#new-game").click(startNewGame);
-      $("#deal").click(dealCards);
-      $("#add-to-crib").click(addToCrib);
-      $("#split-deck").click(splitTheDeck);
-
-
-      $("#new-game").click();
-
-      $("#instructions").html("");
-
-//      var c = new cribbage.model.Cribbage(2);
-//      c.newRound();
-//      var j = c.round.deck.cards.length;
-//      cards = "";
-//      while (j--){
-//          cards += c.round.deck.cards[j].toHtml();
-//          $("#page").append(c.round.deck.cards[j].toHtml());
+//      GAME = null;
+//
+//      function startNewGame(){
+//          $("#intro").hide();
+//          GAME = new cribbage.model.Cribbage();
 //      }
+//
+//      function renderCards(cards){
+//          var html = "";
+//          for (var i=0; i<cards.length; i++){
+//              html += cards[i].toHtml();
+//          }
+//          return html;
+//      }
+//
+//      function toggleCardForCrib(){
+//          var isSelected = $(this).is(".selected");
+//          var needed = GAME.getCribCardCountPerPlayer();
+//          var count = $(this).parent().find(".selected").length;
+//          if (isSelected){
+//              $(this).removeClass("selected");
+//              $("#add-to-crib").attr("disabled", true);
+//          } else if (count < needed){
+//              $(this).addClass("selected");
+//              if (count+1 == needed){
+//                  $("#add-to-crib").attr("disabled", false);
+//              }
+//          }
+//      }
+//
+//      function dealCards(){
+//          GAME.newRound();
+//          $("#hand").append(renderCards(GAME.players[0].cards));
+//          $("#hand .card").click(toggleCardForCrib);
+//      }
+//
+//      function updateScoreBoard(){
+//          $("#score-board").html("p1: "+GAME.players[0].points+" p2: "+GAME.players[1].points);
+//          $("#play-tallie").html(GAME.round.value);
+//      }
+//
+//      function playCard(){
+//          var cardToPlay = this;
+//          $(this).attr("id");
+//          $("#hand .card").each(
+//              function(i, card){
+//                  if (card === cardToPlay){
+//                      GAME.players[0].points += GAME.round.playCard(
+//                          GAME.players[0].getCardToPlay($(card).attr("id")),
+//                          GAME.players[0]);
+//                  }
+//              });
+//          $(cardToPlay).appendTo("#played-cards");;
+//          if (GAME.round.cantContinue){
+//              GAME.round.zero();
+//          } else {
+//              var p1Card = GAME.players[1].pickCardToPlay(GAME.round);
+//              $(p1Card.toHtml()).appendTo("#played-cards");
+//              GAME.players[1].points += GAME.round.playCard(p1Card, GAME.players[1]);
+//          }
+//          updateScoreBoard();
+//
+//      }
+//
+//      function splitTheDeck(){
+//          GAME.splitAndStart(12);
+//          $("#split-deck").hide();
+//          $("#deck").html(GAME.round.starterCard.toHtml()).removeClass("card-stack");
+//          $("#hand .card").unbind("click",toggleCardForCrib).click(playCard);
+//      }
+//
+//      function addToCrib(){
+//          $("#hand .card").each(
+//              function(i, card){
+//                  if ($(card).is(".selected")){
+//                      $(card).remove();
+//                      GAME.round.addToCrib(GAME.players[0].getCardsForCrib($(card).attr('id')));
+//                  }
+//              });
+//          // Add opponent's cards to crib.
+//          GAME.round.addToCrib(GAME.players[1].pickCardsForCrib(GAME.getCribCardCountPerPlayer()));
+//          $("#split-deck").show();
+//      }
+//
+//      $("#new-game").click(startNewGame);
+//      $("#deal").click(dealCards);
+//      $("#add-to-crib").click(addToCrib);
+//      $("#split-deck").click(splitTheDeck);
+//
+//
+//      $("#new-game").click();
+//
+//      $("#instructions").html("");
+//
+
+      ui = new cribbage.ui.CribbageUI();
+      ui.init();
 
   });
