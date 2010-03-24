@@ -30,28 +30,98 @@ var cribbage = {};
          //document.write("<pre>"+a.join(" ")+"</pre>");
      }
 
+     /**
+      * Get points for hand
+      */
+     function getPointsForHand(hand, starter){
+         var permutations = permute(hand.concat([starter]));
+         var points = 0;
+         for (var i=0, ii=permutations.length; i<ii; i++){
+             var description = [];
+             var permPoints = 0;
+             var cards = permutations[i];
+             cards.sort(Card.cmp);
+             var j = cards.length;
+             var sum = 0;
+             while (j--){
+                 sum += cards[j].getValue();
+             }
+             if (sum == 15){
+                 description.push("15 for 2");
+                 permPoints += 2;
+             }
+             if (cards.length == 1){ // nobs
+                 description.push("nobs for 1");
+                 var c = cards[0];
+                 if (c !== starter && c.number === JACK && c.suit === starter.suit){
+                     permPoints += 1;
+                 }
+             }
+             if (cards.length == 2 && cards[0].number == cards[1].number){
+                 description.push("two of a kind for 2");
+                 permPoints += 2; // 2 of a kind.
+             }
+             if (cards.length >= 3){ // straights
+                 var last = cards[cards.length-1];
+                 j = cards.length-1;
+                 var isStraight = true;
+                 while (j--){
+                     if (last.number !== cards[j].number+1){
+                         isStraight = false;
+                         break;
+                     }
+                     last = cards[j];
+                 }
+                 if (isStraight){
+                     description.push("straight for "+cards.length);
+                     permPoints += cards.length;
+                 }
+             }
+             if (cards.length >= 4){ //flushes
+                 var suit = cards[0].suit;
+                 j = cards.length;
+                 var isFlush = true;
+                 while (j--){
+                     if (j.suit !== suit){
+                         isFlush = false;
+                         break;
+                     }
+                 }
+                 if (isFlush){
+                     description.push("flush for "+cards.length);
+                     permPoints += cards.length;
+                 }
+             }
+             if (permPoints){
+                 log(cards.join(" "), "-->", description.join(", "));
+             }
+             points += permPoints;
+         }
+         return points;
+     }
+
+     /**
+      * Get permuations of stuff.
+      */
+     function permute(items){
+         var perms = [];
+         for (var i=0, ii=items.length; i<ii; i++){
+             var base = [items[i]];
+             perms.push(base);
+             var subitems = permute(items.slice(i+1));
+             var j = subitems.length;
+             while (j--){
+                 perms.push(base.concat(subitems[j]));
+             }
+             //for (var j=0, jj=subitems.length; j<jj; j++){
+             //    perms.push(base.concat(subitems[j]));
+             //}
+         }
+         return perms;
+     }
+
      cribbage.model = (
          function(){
-
-             /**
-              * Get permuations of stuff.
-              */
-             function permute(items){
-                 var perms = [];
-                 for (var i=0, ii=items.length; i<ii; i++){
-                     var base = [items[i]];
-                     perms.push(base);
-                     var subitems = permute(items.slice(i+1));
-                     var j = subitems.length;
-                     while (j--){
-                         perms.push(base.concat(subitems[j]));
-                     }
-                     //for (var j=0, jj=subitems.length; j<jj; j++){
-                     //    perms.push(base.concat(subitems[j]));
-                     //}
-                 }
-                 return perms;
-             }
 
              function Card(number, suit){
                  this.number = number;
@@ -305,76 +375,6 @@ var cribbage = {};
                  }
                  return false;
              };
-
-             /**
-              * Get points for hand
-              */
-             function getPointsForHand(hand, starter){
-                 var permutations = permute(hand.concat([starter]));
-                 var points = 0;
-                 for (var i=0, ii=permutations.length; i<ii; i++){
-                     var description = [];
-                     var permPoints = 0;
-                     var cards = permutations[i];
-                     cards.sort(Card.cmp);
-                     var j = cards.length;
-                     var sum = 0;
-                     while (j--){
-                         sum += cards[j].getValue();
-                     }
-                     if (sum == 15){
-                         description.push("15 for 2");
-                         permPoints += 2;
-                     }
-                     if (cards.length == 1){ // nobs
-                         description.push("nobs for 1");
-                         var c = cards[0];
-                         if (c !== starter && c.number === JACK && c.suit === starter.suit){
-                             permPoints += 1;
-                         }
-                     }
-                     if (cards.length == 2 && cards[0].number == cards[1].number){
-                         description.push("two of a kind for 2");
-                         permPoints += 2; // 2 of a kind.
-                     }
-                     if (cards.length >= 3){ // straights
-                         var last = cards[cards.length-1];
-                         j = cards.length-1;
-                         var isStraight = true;
-                         while (j--){
-                             if (last.number !== cards[j].number+1){
-                                 isStraight = false;
-                                 break;
-                             }
-                             last = cards[j];
-                         }
-                         if (isStraight){
-                             description.push("straight for "+cards.length);
-                             permPoints += cards.length;
-                         }
-                     }
-                     if (cards.length >= 4){ //flushes
-                         var suit = cards[0].suit;
-                         j = cards.length;
-                         var isFlush = true;
-                         while (j--){
-                             if (j.suit !== suit){
-                                 isFlush = false;
-                                 break;
-                             }
-                         }
-                         if (isFlush){
-                             description.push("flush for "+cards.length);
-                             permPoints += cards.length;
-                         }
-                     }
-                     if (permPoints){
-                         log(cards.join(" "), "-->", description.join(", "));
-                     }
-                     points += permPoints;
-                 }
-                 return points;
-             }
 
              function Round(players){
                  this.players = players;
@@ -664,7 +664,11 @@ var cribbage = {};
                  addToCribEl: "#add-to-crib",
                  splitDeckEl: "#split-deck",
                  instructionsEl: "#instructions",
-                 playCountEl: "#play-tallie"
+                 playCountEl: "#play-tallie",
+                 playedCardsEl: "#played-cards",
+                 resultsEl: "#results",
+                 continueEl: "#continue",
+                 goEl: "#go"
              };
 
              function renderCards(cards){
@@ -690,7 +694,7 @@ var cribbage = {};
                  this.introEl = null;
                  this.config = $.extend({},defaultCribbageUIConfig,config||{});
                  this.currentState = null;
-                 this.states = [NewRoundState, ChooseCribState, SplitDeckState, PlayCardsState];
+                 this.states = [NewRoundState, ChooseCribState, SplitDeckState, PlayCardsState, FinishRoundState];
              }
 
              /**
@@ -800,7 +804,7 @@ var cribbage = {};
                          card = $(card);
                          if (card.is(".selected")){
                              card.remove();
-                             self.game.round.addToCrib(self.human.getCardsForCrib(card.attr('id')));
+                             self.game.round.addToCrib(self.human.getCardsForCrib([card.attr('id')]));
                          }
                      });
                  // Add opponent's cards to crib.
@@ -858,10 +862,16 @@ var cribbage = {};
                  this.cardEls = this.handEl.find(this.config.cardEl);
                  this.playCountEl = $(this.config.playCountEl);
                  this.goEl = $(this.config.goEl);
+                 this.playedCardsEl = $(this.config.playedCardsEl);
+                 this.continueEl = $(this.config.continueEl);
 
                  this.cardEls.click(p(this.playCard, this));
                  this.ui.setInstructions("Play your cards.");
                  return this;
+             };
+
+             PlayCardsState.prototype.destroy = function(){
+                 this.playedCardsEl.html('').hide();
              };
 
              PlayCardsState.prototype.updateScore = function(){
@@ -870,47 +880,91 @@ var cribbage = {};
 
              PlayCardsState.prototype.zero = function(){
                  this.game.round.zero();
-                 $("#played-cards").html('');
+                 this.playedCardsEl.html('');
+             };
+
+             PlayCardsState.prototype.waitForConfirmation = function(callback){
+                 this.continueEl.show().unbind("click").click(
+                     p(function(){
+                           this.continueEl.hide();
+                           callback.call(this);
+                       },this));
              };
 
              PlayCardsState.prototype.playCard = function(cardToPlay){
                  if (!this.human.canPlay(this.game.round)){
+                     log("human can't play... skipping");
                      return false;
                  }
                  cardToPlay = $(cardToPlay);
                  this.game.round.playCard(this.human.getCardToPlay(cardToPlay.attr("id")),
                                           this.human);
-                 cardToPlay.unbind("click").appendTo("#played-cards");
+                 cardToPlay.unbind("click").appendTo(this.playedCardsEl);
                  this.updateScore();
-                 if (this.game.round.cantContinue){
-                     this.zero();
+                 if (this.game.round.finished){
+                     log("round is finished. waiting for confirmation");
+                     this.waitForConfirmation(this.finish);
+                 } else if (this.game.round.cantContinue){
+                     log("no one can continue. waiting for confirmation to zero out.");
+                     this.waitForConfirmation(this.zero);
                  } else {
+                     log("cpu can continue");
                      var p1Card = this.computer.pickCardToPlay(this.game.round);
                      if (p1Card){
-                         $(p1Card.toHtml()).appendTo("#played-cards");
+                         $(p1Card.toHtml()).appendTo(this.playedCardsEl);
                      }
                      this.computer.points += this.game.round.playCard(p1Card, this.computer);
-                     if (this.game.round.cantContinue){
-                         this.zero();
+                     if (this.game.round.finished){
+                         log("round is now finished");
+                         this.waitForConfirmation(this.finish);
+                     } else if (this.game.round.cantContinue){
+                         log("no one else can continue. Waiting for confirmation to zero out.");
+                         this.waitForConfirmation(this.zero);
                      } else if (!this.human.canPlay(this.game.round)){
+                         log("human cannot play. Display go button and waiting for confirmation.");
                          this.goEl.show().click(p(this.go, this));
                      }
                  }
                  this.updateScore();
                  return true;
              };
+
              PlayCardsState.prototype.go = function(){
+                 this.goEl.hide();
                  while (!this.game.round.cantContinue){
                      var p1Card = this.computer.pickCardToPlay(this.game.round);
-                     $(p1Card.toHtml()).appendTo("#played-cards");
+                     $(p1Card.toHtml()).appendTo(this.playedCardsEl);
                      this.computer.points += this.game.round.playCard(p1Card, this.computer);
                  }
                  if (this.game.round.finished){
-                     this.finish();
+                     log("round is finished. waiting for confirmation.");
+                     this.waitForConfirmation(this.finish);
                  } else {
-                     this.zero();
+                     log("no one else can go. waiting for confirmation.");
+                     this.waitForConfirmation(this.zero);
                  }
              };
+
+             function FinishRoundState(ui){
+                 GameState.call(this, ui);
+             }
+             $.extend(FinishRoundState.prototype, GameState.prototype);
+
+             FinishRoundState.prototype.init = function(){
+                 this.resultsEl = $(this.config.resultsEl).show();
+                 var humanPoints = getPointsForHand(this.human.cards, this.game.round.starterCard);
+                 var computerPoints = getPointsForHand(this.computer.cards, this.game.round.starterCard);
+                 var cribPoints = getPointsForHand(this.game.round.crib, this.game.round.starterCard);
+                 this.resultsEl.html('You got '+humanPoints+" points. "
+                                     + "The computer got "+computerPoints+" points. "
+                                     + "And the crib is worth "+cribPoints+" points. ");
+                 return this;
+             };
+
+             FinishRoundState.prototype.destroy = function(){
+                 this.resultsEl.html('').hide();
+             };
+
 
              return {
                  CribbageUI: CribbageUI
